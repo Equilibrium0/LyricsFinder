@@ -6,8 +6,12 @@ import os
 import tkinter as tk
 from tkinter import filedialog as fd
 
-from mutagen.flac import FLAC
+from mutagen.flac import FLAC, FLACVorbisError
 from mutagen.mp3 import EasyMP3
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, USLT
+
+import eyed3
 
 window = tk.Tk()
 window.title("LyricsFinder")
@@ -28,25 +32,38 @@ class Song:
     filename = ""
     name = ""
     tags = {}
+    format = ''
 
     def __init__(self, file, name):
         self.filename = name
         self.name = namefication(name)
 
         if '.mp3' in name:
-            self.data = EasyMP3(file)
+            self.data = MP3(file, ID3=ID3)
+            self.tags = {
+                'album': self.data.tags['TALB'][0],
+                'title': self.data.tags['TIT2'][0],
+                'artist': self.data.tags['TPE2'][0],
+                'albumartist': self.data.tags['TPE2'][0],
+                'tracknumber': self.data.tags['TRCK'][0],
+                'genre': self.data.tags['TCON'][0],
+                'date': self.data.tags['TDRC'][0]
+            }
+            self.format = 'mp3'
         elif '.flac' in file:
             self.data = FLAC(file)
+            self.tags = {
+                'album': self.data.tags['album'][0],
+                'title': self.data.tags['title'][0],
+                'artist': self.data.tags['artist'][0],
+                'albumartist': self.data.tags['albumartist'][0],
+                'tracknumber': self.data.tags['tracknumber'][0],
+                'genre': self.data.tags['genre'][0],
+                'date': self.data.tags['date'][0]
+            }
+            self.format = 'flac'
 
-        self.tags = {
-            'album': self.data.tags['album'][0],
-            'title': self.data.tags['title'][0],
-            'artist': self.data.tags['artist'][0],
-            'albumartist': self.data.tags['albumartist'][0],
-            'tracknumber': self.data.tags['tracknumber'][0],
-            'genre': self.data.tags['genre'][0],
-            'date': self.data.tags['date'][0]
-        }
+
 
 
 
@@ -110,13 +127,14 @@ def findLrcs():
     genius = Genius("You dont really need token for this")
     if artistEntry.get() != "":
         noArtist.config(text="")
-        for i in range(len(songs)):
-            progressText = f"In Progress... {i+1}/{len(songs)}"
+        i = 1
+        for song in songs:
+            progressText = f"In Progress... {i}/{len(songs)}"
             progress.place(x=126.5, y=230)
             progress.config(text=progressText)
             progress.update()
             try:
-                track = genius.search_song(songs[i].tags['title'], songs[i].tags['artist'])
+                track = genius.search_song(song.tags['title'], song.tags['artist'])
 
                 lrc = track.lyrics
                 lrc = re.sub(r'^\d+\s.*?Contributor.*?Lyrics', '', lrc)
@@ -128,10 +146,15 @@ def findLrcs():
                 lrc = re.sub(r'\[.*?\]\n', '', lrc)
                 lrc = re.sub(r'\n\n\n', '\n\n', lrc)
                 lrc = re.sub(r'\d*Embed', '', lrc)
-                filename = directory + totxt(songs[i].filename)
-                print(filename)
-                with open(filename, 'w', encoding="utf-8") as file:
-                    file.write(lrc)
+                match song.format:
+                    case 'mp3':
+                        uslt_tag = USLT(encoding=3, lang='eng', desc='', text=lrc)
+                        song.data.tags.add(uslt_tag)
+                        song.data.save()
+                    case 'flac':
+                        song.data.tags['lyrics'] = lrc
+                        song.data.save()
+                i += 1
             except Exception as e:
                 print(e)
 
@@ -163,6 +186,14 @@ def setMetaData():
           i += 1
 
 
+# s = FLAC('D:\\Music\\Motionless In White - Scoring The End Of The World (Deluxe Edition) (2023) [WEB]\\01 - Meltdown.flac')
+# s.tags['LYRICS'] = "test"
+# s.save()
+
+# p = MP3("D:\\Music\\Dio 1983 - Holy Diver\\01. Stand Up And Shout.mp3")
+# text_tag = USLT(encoding=3, lang='eng', desc='', text='some test')
+# p.tags.add(text_tag)
+# p.save()
 
 # ENTRIES
 artistEntry = tk.Entry(window, text="", textvariable=artist)
