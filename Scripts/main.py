@@ -90,7 +90,6 @@ def chooseAlbum():
 
     for i in range(len(songs)):
        songList.insert(i, f"{i+1}. "+songs[i].name)
-    print(songs[0].filename)
 
     artistEntry.delete(0, 100)
     artistEntry.insert(0, songs[0].tags['artist'])
@@ -103,6 +102,7 @@ def chooseAlbum():
 
     dateEntry.delete(0, 100)
     dateEntry.insert(0, songs[0].tags['date'])
+    print(songs[0].tags)
 
 
 
@@ -116,13 +116,15 @@ def findLrcs():
             progress.config(text=progressText)
             progress.update()
             try:
-                track = genius.search_song(songs[i].name, artist.get())
+                track = genius.search_song(songs[i].tags['title'], songs[i].tags['artist'])
 
                 lrc = track.lyrics
                 lrc = re.sub(r'^\d+\s.*?Contributor.*?Lyrics', '', lrc)
                 lrc = re.sub(r'See [\w, \s]*? LiveGet tickets as low as \$\d+', '', lrc)
                 lrc = re.sub(r'You might also like\w*?\[', '[', lrc)
                 lrc = re.sub(r'You might also like\w*?$', "", lrc)
+                lrc = re.sub(r'You might also like\n', '', lrc)
+                lrc = re.sub(r'\nYou might also like', "\n", lrc)
                 lrc = re.sub(r'\[.*?\]\n', '', lrc)
                 lrc = re.sub(r'\n\n\n', '\n\n', lrc)
                 lrc = re.sub(r'\d*Embed', '', lrc)
@@ -159,6 +161,7 @@ def setMetaData():
 
           audio.save()
           i += 1
+
 
 
 # ENTRIES
