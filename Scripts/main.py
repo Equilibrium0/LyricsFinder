@@ -6,12 +6,12 @@ import os
 import tkinter as tk
 from tkinter import filedialog as fd
 
-from mutagen.flac import FLAC, FLACVorbisError
+from mutagen.flac import FLAC
 from mutagen.mp3 import EasyMP3
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, USLT
 
-import eyed3
+from threading import Thread
 
 window = tk.Tk()
 window.title("LyricsFinder")
@@ -25,7 +25,7 @@ year = tk.StringVar()
 directory = ""
 songs = []
 names = []
-
+song_threads = []
 
 class Song:
 
@@ -124,39 +124,22 @@ def chooseAlbum():
 
 
 def findLrcs():
-    genius = Genius("You dont really need token for this")
+    global song_threads
     if artistEntry.get() != "":
         noArtist.config(text="")
-        i = 1
         for song in songs:
+
+            song_thread = Thread(target=get_lyrics, args=(song, ))
+            song_threads.append(song_thread)
+            song_thread.start()
+        i = 1
+        for thread in song_threads:
+            thread.join()
             progressText = f"In Progress... {i}/{len(songs)}"
             progress.place(x=126.5, y=230)
             progress.config(text=progressText)
             progress.update()
-            try:
-                track = genius.search_song(song.tags['title'], song.tags['artist'])
-
-                lrc = track.lyrics
-                lrc = re.sub(r'^\d+\s.*?Contributor.*?Lyrics', '', lrc)
-                lrc = re.sub(r'See [\w, \s]*? LiveGet tickets as low as \$\d+', '', lrc)
-                lrc = re.sub(r'You might also like\w*?\[', '[', lrc)
-                lrc = re.sub(r'You might also like\w*?$', "", lrc)
-                lrc = re.sub(r'You might also like\n', '', lrc)
-                lrc = re.sub(r'\nYou might also like', "\n", lrc)
-                lrc = re.sub(r'\[.*?\]\n', '', lrc)
-                lrc = re.sub(r'\n\n\n', '\n\n', lrc)
-                lrc = re.sub(r'\d*Embed', '', lrc)
-                match song.format:
-                    case 'mp3':
-                        uslt_tag = USLT(encoding=3, lang='eng', desc='', text=lrc)
-                        song.data.tags.add(uslt_tag)
-                        song.data.save()
-                    case 'flac':
-                        song.data.tags['lyrics'] = lrc
-                        song.data.save()
-                i += 1
-            except Exception as e:
-                print(e)
+            i += 1
 
         progress.config(text="Done!")
         progress.place(x=156.5, y=230)
@@ -164,6 +147,34 @@ def findLrcs():
 
     else:
         noArtist.config(text="Specify the artist", foreground="#FF0000")
+
+
+def get_lyrics(song):
+    global song_threads
+    genius = Genius("You dont really need token for this")
+    try:
+        track = genius.search_song(song.tags['title'], song.tags['artist'])
+
+        lrc = track.lyrics
+        lrc = re.sub(r'^\d+\s.*?Contributor.*?Lyrics', '', lrc)
+        lrc = re.sub(r'See [\w, \s]*? LiveGet tickets as low as \$\d+', '', lrc)
+        lrc = re.sub(r'You might also like\w*?\[', '[', lrc)
+        lrc = re.sub(r'You might also like\w*?$', "", lrc)
+        lrc = re.sub(r'You might also like\n', '', lrc)
+        lrc = re.sub(r'\nYou might also like', "\n", lrc)
+        lrc = re.sub(r'\[.*?\]\n', '', lrc)
+        lrc = re.sub(r'\n\n\n', '\n\n', lrc)
+        lrc = re.sub(r'\d*Embed', '', lrc)
+        match song.format:
+            case 'mp3':
+                uslt_tag = USLT(encoding=3, lang='eng', desc='', text=lrc)
+                song.data.tags.add(uslt_tag)
+                song.data.save()
+            case 'flac':
+                song.data.tags['lyrics'] = lrc
+                song.data.save()
+    except Exception as e:
+        print(e)
 
 
 def setMetaData():
@@ -185,15 +196,6 @@ def setMetaData():
           audio.save()
           i += 1
 
-
-# s = FLAC('D:\\Music\\Motionless In White - Scoring The End Of The World (Deluxe Edition) (2023) [WEB]\\01 - Meltdown.flac')
-# s.tags['LYRICS'] = "test"
-# s.save()
-
-# p = MP3("D:\\Music\\Dio 1983 - Holy Diver\\01. Stand Up And Shout.mp3")
-# text_tag = USLT(encoding=3, lang='eng', desc='', text='some test')
-# p.tags.add(text_tag)
-# p.save()
 
 # ENTRIES
 artistEntry = tk.Entry(window, text="", textvariable=artist)
